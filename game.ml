@@ -59,7 +59,7 @@ let rec init_blocks block_posn_lst =
   match block_posn_lst with
   | [] -> []
   | (y, x) :: rest ->
-    (((x-.1.)*.bl_w, (y-.1.)*.bl_h), Random.int 5) :: init_blocks rest
+    (((x-.1.)*.bl_w, (y-.1.)*.bl_h), (Random.int 4)+1) :: init_blocks rest
 
 let rec init_balls n =
   if n = 0 then []
@@ -76,7 +76,7 @@ let rec init_items n =
   let x = Random.float (float_of_int width) in
   let y = -.(Random.float (float_of_int (50*n))) in
   if n = 0 then []
-  else ((x, y), n, Random.int 3) :: init_items (n-1)
+  else ((x, y), n, (Random.int 3)) :: init_items (n-1)
          
 (* worldの初期値 *)
 let initial_world =
@@ -385,8 +385,7 @@ let draw world = match world with
     let ball_len = List.length balllst in
     (* let item_len = List.length itemlst in *)
     (place_image (text (string_of_int score) ~size:50 bisque4) (20., 20.)
-       (place_image (text ("Lv. " ^ (string_of_int level)) ~size:50 bisque4) (0., 500.)
-          (* (place_image (text (ball_reflect_num balllst) ~size:50 bisque4) (0., 500.) *)
+       (place_image (text ("Lv. " ^ (string_of_int level)) ~size:30 bisque4) (0., 500.)
           (place_images (make_imageit_lst itemlst) item_pos
              (place_images (make_image_lst ball ball_len) ball_pos
                 (place_images (make_imagebl_lst block blocklst) block_pos
