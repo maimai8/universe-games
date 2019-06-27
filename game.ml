@@ -412,4 +412,4 @@ let _ =
            ~on_tick:move_on_tick
            ~stop_when:last
            ~to_draw_last:draw_last
-	   ~rate:0.01			(* ゲームの動く速さ *)
+	   ~rate:0.005			(* ゲームの動く速さ *)
