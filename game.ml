@@ -42,8 +42,8 @@ let plate w h  = rectangle w h plate_color
 
 let item1 = circle ir ~fill:true ~outline_size:2. darkSlateBlue (* c = color *)
 let item2 = circle ir ~fill:false ~outline_size:2. gold (* c = color *)
-let item4 = circle ir ~fill:true ~outline_size:2. tomato (* c = color *)
-let item3 = circle ir ~fill:false ~outline_size:2. lightGray (* c = color *)
+let item4 = circle ir ~fill:false ~outline_size:2. lightGray (* c = color *)
+let item3 = circle ir ~fill:true ~outline_size:2. tomato (* c = color *)
     
 (* -----画像関係ここまで----- *)
 
