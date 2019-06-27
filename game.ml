@@ -126,9 +126,9 @@ let key_draw world key =
       (blocklst, balllst, itemlst, ((x-.7., y), (pw, ph)), score, level)
     else if key = "right" && x +. pw < float_of_int width then
       (blocklst, balllst, itemlst, ((x+.7., y), (pw, ph)), score, level)
-    else if key = "R" && x +. pw < (float_of_int width)-.30. then
+    else if key = "\\190" && x +. pw < (float_of_int width)-.30. then
       (blocklst, balllst, itemlst, ((x+.30., y), (pw, ph)), score, level)
-    else if key = "L" && x > 30. then
+    else if key = "\\188" && x > 30. then
       (blocklst, balllst, itemlst, ((x-.30., y), (pw, ph)), score, level)
     else
       (blocklst, balllst, itemlst, ((x, y), (pw, ph)), score, level)
