@@ -12,8 +12,8 @@ open Color
 type block_t = (float * float) * int
 (* ball_t : ボールの座標, ボールの進むベクトル, ボールの種類(コメント) の組の型 *)
 type ball_t = (float * float) * (float * float) * string
-(* item_t : アイテムの座標, アイテムの通し番号 * アイテムの種類 の型 *)
-type item_t = (float * float) * int * int
+(* item_t : アイテムの座標, アイテムの種類 の型 *)
+type item_t = (float * float) * int
 (* plate_t : 反射板の座標, (横の長さ, 縦の長さ） の型 *)
 type plate_t = (float * float) * (float * float)
 (* world_t : ブロックリ, ボールリ, アイテムリ, 反射板, スコア レベル の組の型 *)
@@ -22,28 +22,27 @@ type world_t = block_t list * ball_t list * item_t list * plate_t * int * int
 (* -----画像関係----- *)
 
 let width	= 550	(* 画面の幅 *)
-let height	= 560	(* 画面の高さ *)
+let height	= 540	(* 画面の高さ *)
 
-let block_color = blue
-let ball_color = darkSlateBlue
-let plate_color = gray15
+let ball_color  = darkSlateBlue
+let plate_color = gray20
 
 let br = 5.    (* ball radius *)
-let ir = 10.
+let ir = 10.   (* item radius *)
 let bl_w = 50. (* block width *)
 let bl_h = 20. (* block height *)
 let pl_w = 60. (* plate width *)
-let pl_h = 10.  (* plate height *)
+let pl_h = 10. (* plate height *)
 
 let background = empty_scene (float_of_int width) (float_of_int height)
 let block c    = rectangle bl_w bl_h c (* tough color *) 
 let ball       = circle br ball_color
 let plate w h  = rectangle w h plate_color
 
-let item1 = circle ir ~fill:true ~outline_size:2. darkSlateBlue (* c = color *)
-let item2 = circle ir ~fill:false ~outline_size:2. gold (* c = color *)
-let item4 = circle ir ~fill:false ~outline_size:2. lightGray (* c = color *)
-let item3 = circle ir ~fill:true ~outline_size:2. tomato (* c = color *)
+let item1 = circle ir ~fill:true  ~outline_size:2. darkSlateBlue (* ボールを増やす *)
+let item2 = circle ir ~fill:false ~outline_size:2. lightGray (* plateを短くする *)
+let item3 = circle ir ~fill:true  ~outline_size:2. tomato (* plateを長くする *)
+let item4 = circle ir ~fill:true  ~outline_size:2. gold (* ちょっと得点がもらえる *)
     
 (* -----画像関係ここまで----- *)
 
@@ -59,7 +58,8 @@ let rec init_blocks block_posn_lst =
   match block_posn_lst with
   | [] -> []
   | (y, x) :: rest ->
-    (((x-.1.)*.bl_w, (y-.1.)*.bl_h), (Random.int 4)+1) :: init_blocks rest
+    (((x-.1.)*.bl_w, (y-.1.)*.bl_h), (Random.int 4)+1) (* block num = 1~4 *)
+    :: init_blocks rest
 
 let rec init_balls n =
   if n = 0 then []
@@ -70,19 +70,20 @@ let rec init_balls n =
 let init_item n =
   let x = Random.float (float_of_int width) in
   let y = -.(Random.float (float_of_int (50*n))) in
-  ((x, y), n, Random.int 3)
+  ((x, y), (Random.int 4)+1) (* item num = 1~4 *)
   
 let rec init_items n = 
   let x = Random.float (float_of_int width) in
-  let y = -.(Random.float (float_of_int (50*n))) in
+  let y = -.(Random.float (float_of_int (10*n))) in
   if n = 0 then []
-  else ((x, y), n, (Random.int 3)) :: init_items (n-1)
+  else ((x, y), (Random.int 4)+1)  (* item num = 1~4 *)
+       :: init_items (n-1)
          
 (* worldの初期値 *)
 let initial_world =
-  (init_blocks (make_block_posns 8 (width / int_of_float bl_w)),            (* ブロックのリスト *)
-   init_balls 2,                    (* ボール *)
-   init_items 20,                       (* アイテムのリスト *)
+  (init_blocks (make_block_posns 8 (width / int_of_float bl_w)), (* ブロックのリスト *)
+   init_balls 2 , (* ボールのリスト *)
+   init_items 20, (* アイテムのリスト *)
    ((float_of_int (width / 2), float_of_int (height - 30)), (pl_w, pl_h)), (* 反射板 *)
    0, 1)
   
@@ -138,116 +139,109 @@ let key_draw world key =
 (* -----on_tick関係----- *)
 
 (* ある item が plate とぶつかったかどうか調べ、
-   ぶつかったかどうか, ぶつかったitem の番号, ぶつかったitem の種類
-   を組にして返す *)
+   ぶつかっていたら true , ぶつかっていなかったら false を返す *)
 let check_i plate item =
   match (plate, item) with
-  | ((px, py), (pw, ph)), ((ix, iy), num, kind) ->
+  | ((px, py), (pw, ph)), ((ix, iy), kind) ->
     let ir2 = ir *. 2. in
     if px-.ir2 <= ix && ix <= px+.pw && py-.ir <= iy && iy <= py
-    then (true, num, kind)
-    else (false, num, kind)
+    then true else false
 
-(* item list のアイテムが plate にぶつかったかどうか調べ、ぶつかった item のリストの先頭要素を返す *)
-(* plate_t -> item_t list -> (bool * int * int) *)
-let check_item plate item_lst =
-  List.hd (
-    (List.filter (fun (b, n, k) -> b)
-       (List.map (fun item -> check_i plate item) item_lst))
-    @ [(false, 0, 0)])
+(* plate_t -> item_t list -> item_t list * item_t list *)
+let rec remove_itemlst_or_remain_itemlst plate itemlst =
+  List.partition (fun item -> check_i plate item) itemlst
     
 (* world と ぶつかった item の 種類をもらってきたら、 種類に応じてworldを変更する *)
-(* world_t -> int * int -> world_t *)
-let change_by_item world (n, k) =
-  match world with
-    (blocklst, balllst, itemlst, ((x, y), (w, h)), score, level) ->
-    let newitemlst = List.filter (fun ((ix, iy), nn, kk) -> nn <> n) itemlst in
-    let newitemlst = (init_item n) :: newitemlst in
-    match k with
-    | 1 -> let balllst = (init_balls 1) @ balllst in
-      (blocklst, balllst, newitemlst, ((x, y), (w, h)), score, level) (* ball を増やす *)
-    | 2 -> let w = w /. 1.2 in
-      (blocklst, balllst, newitemlst, ((x, y), (w, h)), score, level) (* plate の長さを半分にする *)
-    | 3 -> let w = w +. 4. in
-      (blocklst, balllst, newitemlst, ((x, y), (w, h)), score, level) (* plate の長さを倍にする *)
-    | _ -> (blocklst, balllst, itemlst, ((x, y), (w, h)), score/2, level) (* それ以外のアイテムなら何もしない *)
-
-(* plate と item がぶつかっていたら、世界を変更する *)
-(* world_t -> world_t *)
-let rec react_item world =
+(* world_t -> item_t list -> world_t *)
+let rec change_by_items world remove_itemlst =
   match world with
     (blocklst, balllst, itemlst, plate, score, level) ->
-    let react_item = check_item plate itemlst in
-    match react_item with (b, n, k) ->
-      if b then change_by_item world (n, k)
-      else world
-        
-(* -----反射関係----- *)
-(* plate が ball とぶつかっていたら 新たな方向ベクトル をセットし, 
-   ぶつかっていなかったら そのままの方向ベクトル をセット *)
-(* reflect_p : plate_t -> ball_t -> ball_t *)
-let reflect_p plate ball = match (plate, ball) with
-  | ((px, py), (pw, ph)), ((bx, by), (ix, iy), k) ->
-    let br2 = br *. 2. in
-    if px-.br2 <= bx && bx <= px+.pw && py-.br2 <= by && by <= py
-    then ((bx, by), (ix, -.iy), "reflect plate!")
-    else ball
+    match remove_itemlst with
+    | [] -> world
+    | item :: rest -> match item with ((ix, iy), k) ->
+      if check_i plate item then (* この item は plate とぶつかっている *)
+        match plate with ((x, y), (w, h)) ->
+          if k = 1 then
+            let (balllst : ball_t list) = (init_balls 1) @ balllst in
+            change_by_items (blocklst, balllst, itemlst, ((x, y), (w, h)), score, level) rest
+            (* ball を増やす *)
+          else if k = 2 then
+            let w = w /. 1.2 in
+            change_by_items (blocklst, balllst, itemlst, ((x, y), (w, h)), score, level) rest
+            (* plate の長さを半分にする *)
+          else if k = 3 then
+            let w = w +. 4. in
+            change_by_items (blocklst, balllst, itemlst, ((x, y), (w, h)), score, level) rest
+            (* plate の長さを倍にする *)
+          else if k = 4 then
+          change_by_items (blocklst, balllst, itemlst, ((x, y), (w, h)), score+10, level) rest
+          (* 得点+10 *)
+          else change_by_items (blocklst, balllst, itemlst, ((x, y), (w, h)), score, level) rest
+          (* それ以外のアイテムなら何もしない *)
+      else change_by_items (blocklst, balllst, itemlst, plate, score, level) rest
       
-(* 壁 と ball がぶつかっていたら 新たな方向ベクトルをセット *)
-(* reflect_w : ball_t -> ball_t *)
-let reflect_w ball = match ball with
-  | ((x, y), (ix, iy), kind) ->
-    let br2 = br *. 2. in
-    if x+.br2 >= (float_of_int width) then ((x, y), (-.ix, iy), "reflect right wall")
-    else if x <= 0. then ((x, y), (-.ix, iy), "reflect left wall")
-    else if y <= 0. then ((x,  y), (ix, -.iy), "reflect top wall")
-    else ball
+(* -----反射関係----- *)
 
 (* 各 ball が　plate とぶつかっているか判定して新たな ball list を返す *)
 let reflect_plate ball_lst plate =
-  List.map (fun ball -> reflect_p plate ball) ball_lst
+  (* plate が ball とぶつかっていたら 新たな方向ベクトル をセットし, 
+     ぶつかっていなかったら そのままの方向ベクトル をセット *)
+  (* reflect_p : plate_t -> ball_t -> ball_t *)
+  let reflect_p plate ball = match (plate, ball) with
+    | ((px, py), (pw, ph)), ((bx, by), (ix, iy), k) ->
+      let br2 = br *. 2. in
+      if px-.br2 <= bx && bx <= px+.pw && py-.br2 <= by && by <= py
+      then ((bx, by), (ix, -.iy), "reflect plate!")
+      else ball
+  in List.map (fun ball -> reflect_p plate ball) ball_lst
   
 (* 各 ball が 壁 とぶつかっているかどうか判定して ball list を返す *)
-let reflect_wall ball_lst = List.map reflect_w ball_lst
-
-(* block と ball がぶつかっていたら、硬さを-1する *)
-(* block_t -> ball_t -> block_t *)
-let crash block ball =
-  if snd (check block ball) then
-    match block with
-    | ((x, y), h) -> ((x, y), (h-1))
-  else block
-
-(* block と ball がぶつかっていたら、ball の方向ベクトルを変更する *)
-(* block_t -> ball_t -> ball_t *)
-let reflect_b block ball =
-  match ball with
-    ((x,  y), (ix, iy), kind) ->
-    match fst (check block ball) with
-    | "right"  -> ((x, y), (-.ix, iy), "reflect right block")
-    | "left"   -> ((x, y), (-.ix, iy), "reflect left block")
-    | "top"    -> ((x, y), (ix, -.iy), "reflect top block")
-    | "bottom" -> ((x, y), (ix, -.iy), "reflect bottom block")
-    | _ -> ((x, y), (ix, iy), "not reflect block")
-
-(* ある block に対して、 全ての ball が反応したとき、block がどうなるか *)
-(* block_t -> ball_t list -> block_t *)
-let change_block block ball_lst =
-  List.fold_left (fun block ball -> crash block ball) block ball_lst
+let reflect_wall ball_lst =
+  (* 壁 と ball がぶつかっていたら 新たな方向ベクトルをセット *)
+  (* reflect_w : ball_t -> ball_t *)
+  let reflect_w ball = match ball with
+    | ((x, y), (ix, iy), kind) ->
+      let br2 = br *. 2. in
+      if x+.br2 >= (float_of_int width) then ((x, y), (-.ix, iy), "reflect right wall")
+      else if x <= 0. then ((x, y), (-.ix, iy), "reflect left wall")
+      else if y <= 0. then ((x,  y), (ix, -.iy), "reflect top wall")
+      else ball
+  in List.map reflect_w ball_lst
 
 (* 全ての block に対して、全ての ball が反応したとき、 block list はどうなるか *)
 (* block_t list -> ball_t list -> block_t list *)
-let change_blocks block_lst ball_lst =
-  List.map (fun block -> change_block block ball_lst) block_lst
-
-(* 全ての block に対して、ある ball が反応したとき、 ball がどうなるか *)
-(* block_t list -> ball_t -> ball_t *)
-let react_ball blocklst ball =
-  List.fold_left (fun ball block -> reflect_b block ball ) ball blocklst
+let change_blocks (block_lst : block_t list) (ball_lst : ball_t list) =
+  (* ある block に対して、 全ての ball が反応したとき、block がどうなるか *)
+  (* block_t -> ball_t list -> block_t *)
+  let change_block (block : block_t) (ball_lst : ball_t list) =
+    (* block と ball がぶつかっていたら、硬さを-1する *)
+    (* block_t -> ball_t -> block_t *)
+    let crash block ball =
+      if snd (check block ball) then
+        match block with
+        | ((x, y), h) -> ((x, y), (h-1))
+      else block
+    in List.fold_left (fun block ball -> crash block ball) block ball_lst
+  in List.map (fun block -> change_block block ball_lst) block_lst
 
 (* 全ての block に対して、 全ての ball が反応したとき、 ball list がどうなるか *)
 let react_balls blocklst balllst =
-  List.map (fun ball -> react_ball blocklst ball) balllst
+  (* 全ての block に対して、ある ball が反応したとき、 ball がどうなるか *)
+  (* block_t list -> ball_t -> ball_t *)
+  let react_ball blocklst ball =
+    (* block と ball がぶつかっていたら、ball の方向ベクトルを変更する *)
+    (* block_t -> ball_t -> ball_t *)
+    let reflect_b block ball =
+      match ball with
+        ((x,  y), (ix, iy), kind) ->
+        match fst (check block ball) with
+        | "right"  -> ((x, y), (-.ix, iy), "reflect right block")
+        | "left"   -> ((x, y), (-.ix, iy), "reflect left block")
+        | "top"    -> ((x, y), (ix, -.iy), "reflect top block")
+        | "bottom" -> ((x, y), (ix, -.iy), "reflect bottom block")
+        | _ -> ((x, y), (ix, iy), "not reflect block")           
+    in List.fold_left (fun ball block -> reflect_b block ball ) ball blocklst
+  in List.map (fun ball -> react_ball blocklst ball) balllst
 
 (* 全ての block に対して 全ての ball が どう reflect したか、さらに 完全に crash した block は除去する *)
 (* block_t list -> block_t list *)
@@ -265,8 +259,8 @@ let remove_balls ball_lst =
 
 let remove_items item_lst =
   List.map
-    (fun i -> match i with ((x, y), n, k) ->
-        if lower_y y then i else ((x, -.(Random.float 400.)), n, Random.int 4)) item_lst
+    (fun i -> match i with ((x, y), k) ->
+        if lower_y y then i else ((x, -.(Random.float 400.)), (Random.int 4)+1)) item_lst
     
 (* ball を方向ベクトル分動かす *)
  (* move_ball : ball_t -> ball_t *) 
@@ -277,37 +271,36 @@ let move_ball ((x, y), (ix, iy), kind) =
 
 (* item を下に動かす *)
 (* move_item : item_t -> item_t *)
-let move_item ((x, y), n, k) =
-  if k mod 2 <> 0 then ((x, y +. 0.2), n, k)
-  else ((x, y +. 0.1), n, k)
+let move_item ((x, y), k) =
+  if k mod 2 <> 0 then ((x, y +. 0.2), k)
+  else ((x, y +. 0.1), k)
        
 (* ball を 現在の方向ベクトルに応じて動かす *)
 (* ball が 壁 あるいは plate あるいは block と衝突したら 新たな方向ベクトルをセット *)
-(* ball と block が衝突したら score を加算 *)
+(* ball と block が衝突したら score 加算 *)
 (* 新たな block list をセット *)
 (* 新たな ball list をセット *)
 (* move_on_tick : world_t -> (world_t, 'a) World.t *)
 let move_on_tick world =
   match world with
     (blocklst, balllst, itemlst, plate, score, level) ->
-    let balllst = List.map move_ball balllst in
-    let itemlst = List.map move_item itemlst in
-    let itemlst = remove_items itemlst in
-    let balllst = reflect_wall balllst in
-    let balllst = reflect_plate balllst plate in
-    let balllst = react_balls blocklst balllst in
-    let blocklst = change_blocks blocklst balllst in
-    let newscore = check_score blocklst score in
-    let blocklst = remove_blocks blocklst in
-    let balllst = remove_balls balllst in
+    let balllst : ball_t list = List.map move_ball balllst in
+    let itemlst : item_t list = List.map move_item itemlst in
+    let balllst : ball_t list = reflect_wall balllst in
+    let balllst : ball_t list = reflect_plate balllst plate in
+    let balllst : ball_t list = react_balls blocklst balllst in
+    let blocklst : block_t list = change_blocks blocklst balllst in
+    let newscore : int = check_score blocklst score in
+    let (remove, remain) = remove_itemlst_or_remain_itemlst plate itemlst in 
+    let blocklst : block_t list = remove_blocks blocklst in
+    let balllst : ball_t list = remove_balls balllst in
     let (level, newblocklst) =
       match blocklst with
-      | [] -> (level+1, init_blocks (make_block_posns 10 (width / int_of_float bl_w)))
-      | _ -> (level, blocklst)
-    in
-    let new_world = (newblocklst, balllst, itemlst, plate, newscore, level) in
-    react_item new_world
-              
+      | [] -> (level+1, init_blocks (make_block_posns ((Random.int 15)+1) (width / int_of_float bl_w)))
+      | _  -> (level, blocklst) in
+    let itemlst = remain @ (init_items (List.length remove)) in
+    change_by_items (newblocklst, balllst, itemlst, plate, newscore, level) remove
+    
 (* ----- on_tick関係ここまで ----- *)
 
 (* ----- item 関係 ----- *)
@@ -317,7 +310,7 @@ let rec make_imageit_lst itemlst =
   | [] -> []
   | item :: rest ->
     match item with
-      ((x, y), n, kind) ->
+      ((x, y), kind) ->
       if kind = 1 then item1 :: make_imageit_lst rest
       else if kind = 2 then item2 :: make_imageit_lst rest
       else if kind = 3 then item3 :: make_imageit_lst rest
@@ -348,7 +341,7 @@ let ball_posns ball_lst =
 (* item_t list -> float * float *)
 let item_posns item_lst =
   List.map
-    (fun item -> match item with ((x, y), n, k) -> (x, y))
+    (fun item -> match item with ((x, y), k) -> (x, y))
     item_lst
 
 let rec make_image_lst image n =
@@ -383,9 +376,9 @@ let draw world = match world with
     let ball_pos = ball_posns balllst in
     let item_pos = item_posns itemlst in
     let ball_len = List.length balllst in
-    (* let item_len = List.length itemlst in *)
+    let item_len = List.length itemlst in
     (place_image (text (string_of_int score) ~size:50 bisque4) (20., 20.)
-       (place_image (text ("Lv. " ^ (string_of_int level)) ~size:30 bisque4) (0., 500.)
+       (place_image (text ("Lv. " ^ (string_of_int item_len)) ~size:30 bisque4) (0., 500.)
           (place_images (make_imageit_lst itemlst) item_pos
              (place_images (make_image_lst ball ball_len) ball_pos
                 (place_images (make_imagebl_lst block blocklst) block_pos
