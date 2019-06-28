@@ -1,6 +1,4 @@
 (* TODO: plate と ball の 当たり判定 *)
-(* TODO: アイテムを作って、ball を増やしたりとか ball の種類を変更したりとかする *)
-(* TODO: plate が ゲーム画面 より外に行かないようにすること *)
 open UniverseJs
 open World
 open Image
@@ -376,9 +374,9 @@ let draw world = match world with
     let ball_pos = ball_posns balllst in
     let item_pos = item_posns itemlst in
     let ball_len = List.length balllst in
-    let item_len = List.length itemlst in
+    (* let item_len = List.length itemlst in *) 
     (place_image (text (string_of_int score) ~size:50 bisque4) (20., 20.)
-       (place_image (text ("Lv. " ^ (string_of_int item_len)) ~size:30 bisque4) (0., 500.)
+       (place_image (text ("Lv. " ^ (string_of_int level)) ~size:30 bisque4) (0., 500.)
           (place_images (make_imageit_lst itemlst) item_pos
              (place_images (make_image_lst ball ball_len) ball_pos
                 (place_images (make_imagebl_lst block blocklst) block_pos
